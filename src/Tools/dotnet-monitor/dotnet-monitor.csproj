@@ -28,6 +28,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\Microsoft.Diagnostics.Monitoring.Options\Microsoft.Diagnostics.Monitoring.Options.csproj" />
+    <ProjectReference Include="..\..\Microsoft.Diagnostics.Monitoring.OpenTelemetry\Microsoft.Diagnostics.Monitoring.OpenTelemetry.csproj" />
     <ProjectReference Include="..\..\Microsoft.Diagnostics.Monitoring.WebApi\Microsoft.Diagnostics.Monitoring.WebApi.csproj" />
   </ItemGroup>
 

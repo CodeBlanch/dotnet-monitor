@@ -631,6 +631,15 @@ namespace Microsoft.Diagnostics.Monitoring.WebApi {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to The array of sources for traces to collect..
+        /// </summary>
+        public static string DisplayAttributeDescription_CollectTracesOptions_Sources {
+            get {
+                return ResourceManager.GetString("DisplayAttributeDescription_CollectTracesOptions_Sources", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Buffer size used when copying data from an egress callback returning a stream to the egress callback that is provided a stream to which data is written..
         /// </summary>
         public static string DisplayAttributeDescription_CommonEgressProviderOptions_CopyBufferSize {

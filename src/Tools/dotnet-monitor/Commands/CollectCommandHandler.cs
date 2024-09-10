@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Diagnostics.Monitoring;
 using Microsoft.Diagnostics.Monitoring.WebApi;
 using Microsoft.Diagnostics.Tools.Monitor.Auth;
+using Microsoft.Diagnostics.Tools.Monitor.OpenTelemetry;
 using Microsoft.Diagnostics.Tools.Monitor.Stacks;
 using Microsoft.Diagnostics.Tools.Monitor.Swagger;
 using Microsoft.Extensions.DependencyInjection;
@@ -137,6 +138,7 @@ namespace Microsoft.Diagnostics.Tools.Monitor.Commands
                 services.ConfigureExceptions();
                 services.ConfigureStartupLoggers(authConfigurator);
                 services.ConfigureInProcessFeatures(context.Configuration);
+                services.ConfigureOpenTelemetry();
                 services.AddSingleton<IInProcessFeatures, InProcessFeatures>();
                 services.AddSingleton<IDumpOperationFactory, DumpOperationFactory>();
                 services.AddSingleton<ILogsOperationFactory, LogsOperationFactory>();
@@ -144,6 +146,7 @@ namespace Microsoft.Diagnostics.Tools.Monitor.Commands
                 services.AddSingleton<ITraceOperationFactory, TraceOperationFactory>();
                 services.AddSingleton<IGCDumpOperationFactory, GCDumpOperationFactory>();
                 services.AddSingleton<IStacksOperationFactory, StacksOperationFactory>();
+                services.AddSingleton<ITracesOperationFactory, TracesOperationFactory>();
 
                 // Per-process services must be scoped
                 services.AddScoped<ScopedEndpointInfo>();

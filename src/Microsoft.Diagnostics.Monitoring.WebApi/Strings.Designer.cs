@@ -313,6 +313,33 @@ namespace Microsoft.Diagnostics.Monitoring.WebApi {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Some traces were dropped. Count: {Count}.
+        /// </summary>
+        internal static string LogFormatString_ActivitiesDropped {
+            get {
+                return ResourceManager.GetString("LogFormatString_ActivitiesDropped", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Some traces may have not be processed. Count: {Count}.
+        /// </summary>
+        internal static string LogFormatString_ActivitiesUnprocessed {
+            get {
+                return ResourceManager.GetString("LogFormatString_ActivitiesUnprocessed", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Failed to write traces..
+        /// </summary>
+        internal static string LogFormatString_ActivitiesWriteFailed {
+            get {
+                return ResourceManager.GetString("LogFormatString_ActivitiesWriteFailed", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to The counter {0} ended and is no longer receiving metrics..
         /// </summary>
         internal static string LogFormatString_CounterEndedPayload {

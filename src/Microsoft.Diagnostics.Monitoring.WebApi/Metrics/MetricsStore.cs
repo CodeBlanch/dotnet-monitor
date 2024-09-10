@@ -32,6 +32,7 @@ namespace Microsoft.Diagnostics.Monitoring.WebApi
                 HashCode code = new HashCode();
                 code.Add(_metric.CounterMetadata.ProviderName);
                 code.Add(_metric.CounterMetadata.CounterName);
+                code.Add(_metric.ValueTags);
                 return code.ToHashCode();
             }
 
@@ -48,6 +49,7 @@ namespace Microsoft.Diagnostics.Monitoring.WebApi
         private Dictionary<MetricKey, Queue<ICounterPayload>> _allMetrics = new Dictionary<MetricKey, Queue<ICounterPayload>>();
         private readonly int _maxMetricCount;
         private ILogger<MetricsStoreService> _logger;
+        private DateTime _startTimeUtc = DateTime.UtcNow;
 
         private HashSet<string> _observedErrorMessages = new();
         private HashSet<(string provider, string counter)> _observedEndedCounters = new();
@@ -101,64 +103,197 @@ namespace Microsoft.Diagnostics.Monitoring.WebApi
                 var metricKey = new MetricKey(metric);
                 if (!_allMetrics.TryGetValue(metricKey, out Queue<ICounterPayload> metrics))
                 {
+                    if (_allMetrics.Count > _maxMetricCount)
+                    {
+                        return;
+                    }
+
                     metrics = new Queue<ICounterPayload>();
                     _allMetrics.Add(metricKey, metrics);
                 }
                 metrics.Enqueue(metric);
-                if (metrics.Count > _maxMetricCount)
+            }
+        }
+
+        public void SnapshotMetrics(out MetricsSnapshot snapshot, bool deltaAggregation = false)
+        {
+            var meterLookup = new Dictionary<
+                (string, string),
+                Dictionary<string, (CounterMetadata, List<ICounterPayload>)>>();
+
+            DateTime startTimeUtc;
+            DateTime endTimeUtc;
+
+            lock (_allMetrics)
+            {
+                foreach (var metricGroup in _allMetrics)
                 {
-                    metrics.Dequeue();
+                    var measurements = metricGroup.Value;
+                    if (measurements.Count <= 0)
+                    {
+                        continue;
+                    }
+
+                    var firstMeasurement = measurements.First();
+
+                    if (!EventPipe.TraceEventExtensions.TryGetCounterMetadata(
+                        firstMeasurement.CounterMetadata.ProviderName,
+                        firstMeasurement.CounterMetadata.CounterName,
+                        out var metadata))
+                    {
+                        metadata = firstMeasurement.CounterMetadata;
+                    }
+
+                    var meterKey = (metadata.ProviderName, metadata.ProviderVersion);
+                    if (!meterLookup.TryGetValue(meterKey, out var meter))
+                    {
+                        meter = new();
+                        meterLookup[meterKey] = meter;
+                    }
+
+                    if (!meter.TryGetValue(metadata.CounterName, out var instrument))
+                    {
+                        instrument = new(metadata, new());
+                        meter[metadata.CounterName] = instrument;
+                    }
+
+                    if (firstMeasurement is MeterInstrumentDeltaMeasurementPayload measurementPayload)
+                    {
+                        foreach (var measurement in measurements.Skip(1))
+                        {
+                            measurementPayload.Combine((MeterInstrumentDeltaMeasurementPayload)measurement);
+                        }
+
+                        instrument.Item2.Add(firstMeasurement);
+
+                        if (measurements.Count > 1)
+                        {
+                            measurements.Clear();
+                            if (!deltaAggregation)
+                            {
+                                measurements.Enqueue(firstMeasurement);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        var lastMeasurement = measurements.Last();
+
+                        instrument.Item2.Add(lastMeasurement);
+
+                        if (measurements.Count > 1)
+                        {
+                            measurements.Clear();
+                            if (!deltaAggregation)
+                            {
+                                measurements.Enqueue(lastMeasurement);
+                            }
+                        }
+                    }
                 }
 
-                // CONSIDER We only keep 1 histogram representation per snapshot. Is it meaningful for Prometheus to see previous histograms? These are not timestamped.
-                if ((metrics.Count > 1) && (metric is AggregatePercentilePayload))
+                startTimeUtc = _startTimeUtc;
+                if (deltaAggregation)
                 {
-                    metrics.Dequeue();
+                    endTimeUtc = _startTimeUtc = DateTime.UtcNow;
+                }
+                else
+                {
+                    endTimeUtc = DateTime.UtcNow;
                 }
             }
+
+            var meters = new List<MetricsSnapshotMeter>();
+            foreach (var meter in meterLookup)
+            {
+                var instruments = new List<MetricsSnapshotInstrument>();
+                foreach (var instrument in meter.Value)
+                {
+                    instruments.Add(
+                        new(instrument.Value.Item1, instrument.Value.Item2));
+                }
+
+                meters.Add(
+                    new(
+                        meterName: meter.Key.Item1,
+                        meterVersion: meter.Key.Item2,
+                        instruments));
+            }
+
+            snapshot = new(startTimeUtc, endTimeUtc, meters);
         }
 
         public async Task SnapshotMetrics(Stream outputStream, CancellationToken token)
         {
-            Dictionary<MetricKey, Queue<ICounterPayload>> copy = null;
+            Dictionary<MetricKey, ICounterPayload> snapshot = new Dictionary<MetricKey, ICounterPayload>();
             lock (_allMetrics)
             {
-                copy = new Dictionary<MetricKey, Queue<ICounterPayload>>();
                 foreach (var metricGroup in _allMetrics)
                 {
-                    copy.Add(metricGroup.Key, new Queue<ICounterPayload>(metricGroup.Value));
+                    var measurements = metricGroup.Value;
+
+                    var firstMeasurement = measurements.First();
+
+                    if (firstMeasurement is MeterInstrumentDeltaMeasurementPayload measurementPayload)
+                    {
+                        foreach (var measurement in measurements.Skip(1))
+                        {
+                            measurementPayload.Combine((MeterInstrumentDeltaMeasurementPayload)measurement);
+                        }
+
+                        snapshot.Add(metricGroup.Key, firstMeasurement);
+
+                        if (measurements.Count > 1)
+                        {
+                            measurements.Clear();
+
+                            measurements.Enqueue(firstMeasurement);
+                        }
+                    }
+                    else
+                    {
+                        var lastMeasurement = measurements.Last();
+
+                        snapshot.Add(metricGroup.Key, lastMeasurement);
+
+                        if (measurements.Count > 1)
+                        {
+                            measurements.Clear();
+
+                            measurements.Enqueue(lastMeasurement);
+                        }
+                    }
                 }
+
+                _allMetrics.Clear();
             }
 
             await using var writer = new StreamWriter(outputStream, EncodingCache.UTF8NoBOMNoThrow, bufferSize: 1024, leaveOpen: true);
             writer.NewLine = "\n";
 
-            foreach (var metricGroup in copy)
+            foreach (var metricGroup in snapshot)
             {
-                ICounterPayload metricInfo = metricGroup.Value.First();
+                ICounterPayload metric = metricGroup.Value;
 
-                string metricName = PrometheusDataModel.GetPrometheusNormalizedName(metricInfo.CounterMetadata.ProviderName, metricInfo.CounterMetadata.CounterName, metricInfo.Unit);
+                string metricName = PrometheusDataModel.GetPrometheusNormalizedName(metric.CounterMetadata.ProviderName, metric.CounterMetadata.CounterName, metric.Unit);
 
-                await WriteMetricHeader(metricInfo, writer, metricName);
+                await WriteMetricHeader(metric, writer, metricName);
 
-                foreach (var metric in metricGroup.Value)
+                if (metric is AggregatePercentilePayload aggregatePayload)
                 {
-                    if (metric is AggregatePercentilePayload aggregatePayload)
+                    // Summary quantiles must appear from smallest to largest
+                    foreach (Quantile quantile in aggregatePayload.Quantiles.OrderBy(q => q.Percentage))
                     {
-                        // Summary quantiles must appear from smallest to largest
-                        foreach (Quantile quantile in aggregatePayload.Quantiles.OrderBy(q => q.Percentage))
-                        {
-                            string metricValue = PrometheusDataModel.GetPrometheusNormalizedValue(metric.Unit, quantile.Value);
-                            string metricLabels = GetMetricLabels(metric, quantile.Percentage);
-                            await WriteMetricDetails(writer, metric, metricName, metricValue, metricLabels);
-                        }
-                    }
-                    else
-                    {
-                        string metricValue = PrometheusDataModel.GetPrometheusNormalizedValue(metric.Unit, metric.Value);
-                        string metricLabels = GetMetricLabels(metric, quantile: null);
+                        string metricValue = PrometheusDataModel.GetPrometheusNormalizedValue(metric.Unit, quantile.Value);
+                        string metricLabels = GetMetricLabels(metric, quantile.Percentage);
                         await WriteMetricDetails(writer, metric, metricName, metricValue, metricLabels);
                     }
+                }
+                else
+                {
+                    string metricValue = PrometheusDataModel.GetPrometheusNormalizedValue(metric.Unit, metric.Value);
+                    string metricLabels = GetMetricLabels(metric, quantile: null);
+                    await WriteMetricDetails(writer, metric, metricName, metricValue, metricLabels);
                 }
             }
         }

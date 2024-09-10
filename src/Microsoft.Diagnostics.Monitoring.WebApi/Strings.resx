@@ -225,6 +225,15 @@
   <data name="FeatureName_ParameterCapturing" xml:space="preserve">
     <value>Parameter Capturing</value>
   </data>
+  <data name="LogFormatString_ActivitiesDropped" xml:space="preserve">
+    <value>Some traces were dropped. Count: {Count}</value>
+  </data>
+  <data name="LogFormatString_ActivitiesUnprocessed" xml:space="preserve">
+    <value>Some traces may have not be processed. Count: {Count}</value>
+  </data>
+  <data name="LogFormatString_ActivitiesWriteFailed" xml:space="preserve">
+    <value>Failed to write traces.</value>
+  </data>
   <data name="LogFormatString_CounterEndedPayload" xml:space="preserve">
     <value>The counter {0} ended and is no longer receiving metrics.</value>
   </data>

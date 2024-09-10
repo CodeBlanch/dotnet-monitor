@@ -773,4 +773,8 @@
     <value>The expected value of the 'iss' or Issuer field in the JWT (JSON Web Token).</value>
     <comment>The description provided for the Issuer parameter on MonitorApiKeyOptions.</comment>
   </data>
+  <data name="DisplayAttributeDescription_CollectTracesOptions_Sources" xml:space="preserve">
+    <value>The array of sources for traces to collect.</value>
+    <comment>The description provided for the Sources parameter on CollectTracesOptions.</comment>
+  </data>
 </root>

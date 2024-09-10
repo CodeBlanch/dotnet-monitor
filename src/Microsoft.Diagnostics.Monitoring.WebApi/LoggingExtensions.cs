@@ -117,6 +117,24 @@ namespace Microsoft.Diagnostics.Monitoring.WebApi
                 logLevel: LogLevel.Information,
                 formatString: Strings.Message_GeneratedInProcessArtifact);
 
+        private static readonly Action<ILogger, long, Exception> _activitiesDropped =
+            LoggerMessage.Define<long>(
+                eventId: new EventId(19, "ActivitiesDropped"),
+                logLevel: LogLevel.Warning,
+                formatString: Strings.LogFormatString_ActivitiesDropped);
+
+        private static readonly Action<ILogger, int, Exception> _activitiesUnprocessed =
+            LoggerMessage.Define<int>(
+                eventId: new EventId(20, "ActivitiesUnprocessed"),
+                logLevel: LogLevel.Warning,
+                formatString: Strings.LogFormatString_ActivitiesUnprocessed);
+
+        private static readonly Action<ILogger, Exception> _activitiesWriteFailed =
+            LoggerMessage.Define(
+                eventId: new EventId(21, "ActivitiesWriteFailed"),
+                logLevel: LogLevel.Error,
+                formatString: Strings.LogFormatString_ActivitiesWriteFailed);
+
         public static void RequestFailed(this ILogger logger, Exception ex)
         {
             _requestFailed(logger, ex);
@@ -205,6 +223,21 @@ namespace Microsoft.Diagnostics.Monitoring.WebApi
         public static void GeneratedInProcessArtifact(this ILogger logger)
         {
             _generatedInProcessArtifact(logger, null);
+        }
+
+        public static void ActivitiesDropped(this ILogger logger, long count)
+        {
+            _activitiesDropped(logger, count, null);
+        }
+
+        public static void ActivitiesUnprocessed(this ILogger logger, int count)
+        {
+            _activitiesUnprocessed(logger, count, null);
+        }
+
+        public static void ActivitiesWriteFailed(this ILogger logger, Exception ex)
+        {
+            _activitiesWriteFailed(logger, ex);
         }
     }
 }
