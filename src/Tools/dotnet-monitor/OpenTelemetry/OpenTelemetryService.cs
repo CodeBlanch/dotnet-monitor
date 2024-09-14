@@ -377,9 +377,11 @@ internal sealed class OpenTelemetryCountersLogger : MetricProducer, ICountersLog
 
     public override bool Produce(MetricWriter writer, CancellationToken cancellationToken)
     {
+        AggregationTemporality aggregationTemporality = _Options.MetricsOptions.AggregationTemporality;
+
         _MetricsStore.SnapshotMetrics(
             out var snapshot,
-            deltaAggregation: _Options.MetricsOptions.AggregationTemporality == AggregationTemporality.Delta);
+            deltaAggregation: aggregationTemporality == AggregationTemporality.Delta);
 
         foreach (var meter in snapshot.Meters)
         {
@@ -403,7 +405,7 @@ internal sealed class OpenTelemetryCountersLogger : MetricProducer, ICountersLog
                                 otelMetric = new Metric(
                                     Monitoring.OpenTelemetry.Metrics.MetricType.DoubleSum,
                                     instrument.Metadata.CounterName,
-                                    _Options.MetricsOptions.AggregationTemporality)
+                                    aggregationTemporality)
                                 {
                                     Unit = instrument.Metadata.CounterUnit,
                                     Description = instrument.Metadata.CounterDescription
@@ -423,7 +425,7 @@ internal sealed class OpenTelemetryCountersLogger : MetricProducer, ICountersLog
                                 otelMetric = new Metric(
                                     Monitoring.OpenTelemetry.Metrics.MetricType.DoubleSumNonMonotonic,
                                     instrument.Metadata.CounterName,
-                                    _Options.MetricsOptions.AggregationTemporality)
+                                    AggregationTemporality.Cumulative)
                                 {
                                     Unit = instrument.Metadata.CounterUnit,
                                     Description = instrument.Metadata.CounterDescription
@@ -433,7 +435,7 @@ internal sealed class OpenTelemetryCountersLogger : MetricProducer, ICountersLog
                                 otelMetric = new Metric(
                                     Monitoring.OpenTelemetry.Metrics.MetricType.Histogram,
                                     instrument.Metadata.CounterName,
-                                    _Options.MetricsOptions.AggregationTemporality)
+                                    aggregationTemporality)
                                 {
                                     Unit = instrument.Metadata.CounterUnit,
                                     Description = instrument.Metadata.CounterDescription
@@ -446,17 +448,22 @@ internal sealed class OpenTelemetryCountersLogger : MetricProducer, ICountersLog
                         writer.BeginMetric(otelMetric);
                     }
 
+                    DateTime startTimeUtc = otelMetric.AggregationTemporality == AggregationTemporality.Cumulative
+                        ? snapshot.ProcessStartTimeUtc
+                        : snapshot.LastCollectionStartTimeUtc;
+                    DateTime endTimeUtc = snapshot.LastCollectionEndTimeUtc;
+
                     switch (otelMetric.MetricType)
                     {
                         case Monitoring.OpenTelemetry.Metrics.MetricType.DoubleSum:
                         case Monitoring.OpenTelemetry.Metrics.MetricType.DoubleGauge:
                         case Monitoring.OpenTelemetry.Metrics.MetricType.DoubleSumNonMonotonic:
-                            WriteNumberMetricPoint(writer, snapshot, metricPoint);
+                            WriteNumberMetricPoint(writer, startTimeUtc, endTimeUtc, metricPoint);
                             break;
                         case Monitoring.OpenTelemetry.Metrics.MetricType.Histogram:
                             if (metricPoint is AggregatePercentilePayload aggregatePercentilePayload)
                             {
-                                WriteHistogramMetricPoint(writer, snapshot, aggregatePercentilePayload);
+                                WriteHistogramMetricPoint(writer, startTimeUtc, endTimeUtc, aggregatePercentilePayload);
                             }
                             break;
                     }
@@ -476,7 +483,8 @@ internal sealed class OpenTelemetryCountersLogger : MetricProducer, ICountersLog
 
     private static void WriteNumberMetricPoint(
         MetricWriter writer,
-        MetricsSnapshot snapshot,
+        DateTime startTimeUtc,
+        DateTime endTimeUtc,
         ICounterPayload payload)
     {
         double value = payload is IRatePayload ratePayload
@@ -484,8 +492,8 @@ internal sealed class OpenTelemetryCountersLogger : MetricProducer, ICountersLog
             : payload.Value;
 
         var numberMetricPoint = new NumberMetricPoint(
-            snapshot.StartTimeUtc,
-            snapshot.EndTimeUtc,
+            startTimeUtc,
+            endTimeUtc,
             value);
 
         writer.WriteNumberMetricPoint(
@@ -495,12 +503,13 @@ internal sealed class OpenTelemetryCountersLogger : MetricProducer, ICountersLog
 
     private static void WriteHistogramMetricPoint(
         MetricWriter writer,
-        MetricsSnapshot snapshot,
+        DateTime startTimeUtc,
+        DateTime endTimeUtc,
         AggregatePercentilePayload payload)
     {
         var histogramMetricPoint = new HistogramMetricPoint(
-            snapshot.StartTimeUtc,
-            snapshot.EndTimeUtc,
+            startTimeUtc,
+            endTimeUtc,
             features: HistogramMetricPointFeatures.None,
             min: default,
             max: default,

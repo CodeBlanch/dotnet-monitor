@@ -13,13 +13,15 @@ namespace Microsoft.Diagnostics.Monitoring.OpenTelemetry.Metrics;
 /// </summary>
 public enum AggregationTemporality : byte
 {
-    /// <summary>
-    /// Cumulative.
-    /// </summary>
-    Cumulative = 1,
+    Unspecified = 0,
 
     /// <summary>
     /// Delta.
     /// </summary>
-    Delta = 2,
+    Delta = 1,
+
+    /// <summary>
+    /// Cumulative.
+    /// </summary>
+    Cumulative = 2,
 }

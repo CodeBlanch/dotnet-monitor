@@ -46,10 +46,11 @@ namespace Microsoft.Diagnostics.Monitoring.WebApi
             }
         }
 
-        private Dictionary<MetricKey, Queue<ICounterPayload>> _allMetrics = new Dictionary<MetricKey, Queue<ICounterPayload>>();
+        private readonly Dictionary<MetricKey, Queue<ICounterPayload>> _allMetrics = new Dictionary<MetricKey, Queue<ICounterPayload>>();
         private readonly int _maxMetricCount;
-        private ILogger<MetricsStoreService> _logger;
-        private DateTime _startTimeUtc = DateTime.UtcNow;
+        private readonly ILogger<MetricsStoreService> _logger;
+        private static readonly DateTime s_processStartTimeUtc = DateTime.UtcNow;
+        private DateTime _lastCollectionStartTimeUtc = s_processStartTimeUtc;
 
         private HashSet<string> _observedErrorMessages = new();
         private HashSet<(string provider, string counter)> _observedEndedCounters = new();
@@ -121,8 +122,8 @@ namespace Microsoft.Diagnostics.Monitoring.WebApi
                 (string, string),
                 Dictionary<string, (CounterMetadata, List<ICounterPayload>)>>();
 
-            DateTime startTimeUtc;
-            DateTime endTimeUtc;
+            DateTime lastCollectionStartTimeUtc;
+            DateTime lastCollectionEndTimeUtc;
 
             lock (_allMetrics)
             {
@@ -169,7 +170,7 @@ namespace Microsoft.Diagnostics.Monitoring.WebApi
                         if (measurements.Count > 1)
                         {
                             measurements.Clear();
-                            if (!deltaAggregation)
+                            if (!deltaAggregation || !measurementPayload.SupportsDelta)
                             {
                                 measurements.Enqueue(firstMeasurement);
                             }
@@ -192,15 +193,8 @@ namespace Microsoft.Diagnostics.Monitoring.WebApi
                     }
                 }
 
-                startTimeUtc = _startTimeUtc;
-                if (deltaAggregation)
-                {
-                    endTimeUtc = _startTimeUtc = DateTime.UtcNow;
-                }
-                else
-                {
-                    endTimeUtc = DateTime.UtcNow;
-                }
+                lastCollectionStartTimeUtc = _lastCollectionStartTimeUtc;
+                lastCollectionEndTimeUtc = _lastCollectionStartTimeUtc = DateTime.UtcNow;
             }
 
             var meters = new List<MetricsSnapshotMeter>();
@@ -220,7 +214,7 @@ namespace Microsoft.Diagnostics.Monitoring.WebApi
                         instruments));
             }
 
-            snapshot = new(startTimeUtc, endTimeUtc, meters);
+            snapshot = new(s_processStartTimeUtc, lastCollectionStartTimeUtc, lastCollectionEndTimeUtc, meters);
         }
 
         public async Task SnapshotMetrics(Stream outputStream, CancellationToken token)

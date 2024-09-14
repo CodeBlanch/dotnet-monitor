@@ -15,6 +15,8 @@ public sealed class Metric
 
     public AggregationTemporality AggregationTemporality { get; }
 
+    public bool IsSumNonMonotonic => ((byte)MetricType & 0x80) == 1;
+
     public Metric(MetricType metricType, string name, AggregationTemporality aggregationTemporality)
     {
         ArgumentException.ThrowIfNullOrEmpty(name);
@@ -22,5 +24,11 @@ public sealed class Metric
         MetricType = metricType;
         Name = name;
         AggregationTemporality = aggregationTemporality;
+
+        if (IsSumNonMonotonic
+            && AggregationTemporality == AggregationTemporality.Delta)
+        {
+            AggregationTemporality = AggregationTemporality.Cumulative;
+        }
     }
 }

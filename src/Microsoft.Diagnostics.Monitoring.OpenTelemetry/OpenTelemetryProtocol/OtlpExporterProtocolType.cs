@@ -5,6 +5,6 @@ namespace Microsoft.Diagnostics.Monitoring.OpenTelemetry.OpenTelemetryProtocol;
 
 public enum OtlpExporterProtocolType
 {
-    Unknown,
-    HttpProtobuf
+    Unknown = 0,
+    HttpProtobuf = 1
 }

@@ -26,19 +26,23 @@ namespace Microsoft.Diagnostics.Monitoring.WebApi
 
     internal sealed class MetricsSnapshot
     {
-        public DateTime StartTimeUtc { get; }
+        public DateTime ProcessStartTimeUtc { get; }
 
-        public DateTime EndTimeUtc { get; }
+        public DateTime LastCollectionStartTimeUtc { get; }
+
+        public DateTime LastCollectionEndTimeUtc { get; }
 
         public IReadOnlyList<MetricsSnapshotMeter> Meters { get; }
 
         public MetricsSnapshot(
-            DateTime startTimeUtc,
-            DateTime endTimeUtc,
+            DateTime processStartTimeUtc,
+            DateTime lastCollectionStartTimeUtc,
+            DateTime lastCollectionEndTimeUtc,
             IReadOnlyList<MetricsSnapshotMeter> meters)
         {
-            StartTimeUtc = startTimeUtc;
-            EndTimeUtc = endTimeUtc;
+            ProcessStartTimeUtc = processStartTimeUtc;
+            LastCollectionStartTimeUtc = lastCollectionStartTimeUtc;
+            LastCollectionEndTimeUtc = lastCollectionEndTimeUtc;
             Meters = meters;
         }
     }

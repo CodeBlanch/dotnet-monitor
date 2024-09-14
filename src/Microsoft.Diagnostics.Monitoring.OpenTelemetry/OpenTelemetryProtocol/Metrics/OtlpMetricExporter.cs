@@ -168,7 +168,7 @@ public sealed class OtlpMetricExporter : OtlpExporter<OtlpCollectorMetrics.Expor
                 case MetricType.DoubleSumNonMonotonic:
                     _Metric.Sum = new()
                     {
-                        IsMonotonic = ((byte)metric.MetricType & 0x80) == 0,
+                        IsMonotonic = !metric.IsSumNonMonotonic,
                         AggregationTemporality = aggregationTemporality,
                     };
                     break;
