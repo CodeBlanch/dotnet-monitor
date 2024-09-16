@@ -28,7 +28,7 @@ public sealed class Metric
         if (IsSumNonMonotonic
             && AggregationTemporality == AggregationTemporality.Delta)
         {
-            AggregationTemporality = AggregationTemporality.Cumulative;
+            throw new NotSupportedException("Delta aggregation temporality cannot be used with non-monotonic sums");
         }
     }
 }
