@@ -140,6 +140,7 @@ namespace Microsoft.Diagnostics.Monitoring.WebApi
                     if (!EventPipe.TraceEventExtensions.TryGetCounterMetadata(
                         firstMeasurement.CounterMetadata.ProviderName,
                         firstMeasurement.CounterMetadata.CounterName,
+                        firstMeasurement.CounterMetadata.Id,
                         out var metadata))
                     {
                         metadata = firstMeasurement.CounterMetadata;
